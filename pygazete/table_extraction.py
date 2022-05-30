@@ -50,19 +50,10 @@ def advanced(MAXTRIALTIME=MAXTRIALTIME,
     except KeyError:
         raise KeyError("The path keyword 'IMGDIR' is invalid or not found! Please pass the correct directory of test images")
     
-    # set directories
-    RESULTDIR = os.path.join(DIR, 'runs\\detect')
+    create_folders(DIR) # set directories
+    
     tstamp = time.strftime("%y%m%d-%H%M%S", time.localtime())
     
-    exps = os.listdir(RESULTDIR)
-    exps = sorted([e for e in exps if e != 'exp' and e.startswith('exp')], key = lambda x: int(x[3:]))
-    PREDDIR = os.path.join(RESULTDIR, exps[-1])
-    LB_PREDDIR = os.path.join(PREDDIR, 'labels')
-    CROPDIR = os.path.join(PREDDIR, 'crops\\table')
-    
-    PLOTDIR = new_dir(PREDDIR, 'plots')
-    DATADIR = new_dir(PREDDIR, 'gaze_data')
-    OCRDIR = new_dir(PREDDIR, 'ocr')
     LOGFILENAME = tstamp+'D'+str(MAXTRIALTIME//1000)
     LOGFILE = os.path.join(DATADIR, LOGFILENAME)
     
@@ -350,3 +341,26 @@ def advanced(MAXTRIALTIME=MAXTRIALTIME,
     disp.close()
         
     return t_list
+    
+    
+def create_folders(DIR):
+    global RESULTDIR
+    global PREDDIR
+    global LB_PREDDIR
+    global CROPDIR
+    global PLOTDIR
+    global DATADIR
+    global OCRDIR
+    RESULTDIR = os.path.join(DIR, 'runs\\detect')
+
+    exps = os.listdir(RESULTDIR)
+    exps = sorted([e for e in exps if e != 'exp' and e.startswith('exp')], key = lambda x: int(x[3:]))
+    PREDDIR = os.path.join(RESULTDIR, exps[-1])
+    LB_PREDDIR = os.path.join(PREDDIR, 'labels')
+    CROPDIR = os.path.join(PREDDIR, 'crops\\table')
+    
+    PLOTDIR = new_dir(PREDDIR, 'plots')
+    DATADIR = new_dir(PREDDIR, 'gaze_data')
+    OCRDIR = new_dir(PREDDIR, 'ocr')
+    
+    return 
