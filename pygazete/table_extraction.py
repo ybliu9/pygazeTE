@@ -362,5 +362,3 @@ def create_folders(DIR):
     PLOTDIR = new_dir(PREDDIR, 'plots')
     DATADIR = new_dir(PREDDIR, 'gaze_data')
     OCRDIR = new_dir(PREDDIR, 'ocr')
-    
-    return 

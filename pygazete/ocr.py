@@ -51,7 +51,7 @@ def reconstruction_check(df:pd.DataFrame):
 
 
 
-def extract(test_file_path, output_dir, mode=7, split='cell',borderless=True,debug=False):
+def extract(test_file_path, output_dir, mode=7, split='cell',borderless=True,display_data=False, debug=False):
 	"""
     Reads in an image, performs table extraction, and saves prediction results in local files
     
@@ -84,6 +84,7 @@ def extract(test_file_path, output_dir, mode=7, split='cell',borderless=True,deb
                         split = 'cell' with mode = 7 can reconstruct table structure but 
                         is twice slower than split = 'row'
     borderless          bool, whether the table is borderless
+    display_data        bool, if display_data == True, display predicted data
     debug               bool, debug flag, if debug == True, display debugging plots
     
                         
@@ -134,8 +135,9 @@ def extract(test_file_path, output_dir, mode=7, split='cell',borderless=True,deb
 
 	# show preview for debugging
 	if debug:   
-		#show_images(raw, image) 
-		print(data)
-
+		show_images(raw, image)
+	if display_data:
+		print(pd.DataFrame(data).to_markdown())
+        
 	return data
     
