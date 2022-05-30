@@ -238,6 +238,7 @@ def get_borders(img=None, method = 'row', borderless=True,
 
     else:
         thresh = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        noline1 = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
         mask = 255-thresh
         processed = thresh.copy()
         
@@ -308,8 +309,8 @@ def get_borders(img=None, method = 'row', borderless=True,
         
         plots_['original image with border coordinates'] = im
         plots_['removing background and thresholding'] = thresh
-        plots_['remove lines (column)'] = noline0
-        plots_['remove lines (row)'] = noline1
+        #plots_['remove lines (column)'] = noline0
+        #plots_['remove lines (row)'] = noline1
         plots_['binary mask'] = mask
         subtitle = img_name + ': ' if img_name is not None else ""
         if method == 'cell':
