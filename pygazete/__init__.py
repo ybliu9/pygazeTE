@@ -31,3 +31,21 @@ version = u'0.2.1'
 #	You should have received a copy of the GNU General Public License
 #	along with this program.  If not, see <http://www.gnu.org/licenses/>
 
+from pygazete.constants import *
+from pygazete.preprocess import *
+from pygazete.datasets import *
+from pygazete.table_structure import *
+from pygazete.gazeplotter import *
+from pygazete.table_extraction import *
+from pygazete.ocr import *
+#from pygazete.evaluate import *
+#from pygazete.extraction_baseline import *
+
+acknowledgement = "PygazeTE imported.\n"
+acknowledgement += "Some important defaults: \n"
+acknowledgement += "\tDISPSIZE = %s \t(Desired size of display in pixels),\n\tSCREENSIZE = %s \t(Size of screen in centimeters),\n\tip = %s \t\t(IP address for Gazepoint connection),\n\t... ...\n" % (str(DISPSIZE), str(SCREENSIZE), ip)
+acknowledgement += "Please beware of the default constants and change variables to adapt.\n"
+acknowledgement += "You can either reassign the variables or change the default values in the root script from pygazete.constants"
+print(acknowledgement)
+
+

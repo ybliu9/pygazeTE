@@ -14,12 +14,11 @@ DISPTYPE = 'psychopy'
 # the DISPSIZE is the monitor resolution, e.g. (1024,768)
 #DISPSIZE = (1920,1080) #(2880, 1800) #(1024,768)
 DISPSIZE = (1024,1024)
-# image size (scale = 1.1)
-#IMGSIZE = (int(629*1.1), int(805*1.1))
-IMGSIZE= (629, 805)
+# image size 
+IMGSIZE= (1200,1553)
 
-#RESCALE = min(round(DISPSIZE[0]/IMGSIZE[0],1), round(DISPSIZE[1]/IMGSIZE[1],1))
 #RESCALE = 1.1
+RESCALE = min(round(DISPSIZE[0] / IMGSIZE[0], 1), round(DISPSIZE[1] / IMGSIZE[1], 1))
 # the SCREENSIZE is the physical screen size in centimeters, e.g. (39.9,29.9)
 SCREENSIZE = (34.4, 19.3)
 
@@ -38,9 +37,7 @@ TEXTSIZE = 12
 
 #Experiment variables
 #    The distance between the participant and the display (cm)
-SCREENDIST = 60.0             
-#    The noisy situations in experiment (e.g. dstr, qb, eo)
-NOISE = ''                    
+SCREENDIST = 60.0                               
 #    Maximum length of time for each image to be displayed (ms)
 MAXTRIALTIME = 10000         
 #    Maximum length of time for fixation (s)

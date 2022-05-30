@@ -59,21 +59,33 @@ def process_data(datadir:str, datafile:str, logfile:str, ntrials:int):
     # Slicing
     df = df.iloc[i:, COLUMNS].reset_index(drop=True)
     
-    # create a new column to store image name
+    # create new columns to store image-specific info
+    
+    df['RESCALE'] = None
+    df['IMGSIZE'] = None
     df['IMGID'] = -1
     
     
     for i in range(ntrials):
-        s = df.index[df.USER.isin(log_trim[i*5:i*5+3])].tolist()
-        e = df.index[df.USER.isin(log_trim[i*5+3:(i+1)*5])].tolist()
+        s = df.index[df.USER.isin(log_trim[i*7:i*7+5])].tolist()
+        e = df.index[df.USER.isin(log_trim[i*7+5:(i+1)*7])].tolist()
         if s and e:
-            df.iloc[s[0]:e[-1]+1, -1] = log_trim[i*5+1][10:]#.lstrip('IMAGENAME ')
+            r_idx = 
+            df.iloc[s[0]:e[-1]+1, -1] = log_trim[i*7+1][10:]#.lstrip('IMAGENAME ')
+            df.iloc[s[0]:e[-1]+1, -2] = log_trim[i*7+2][8:]
+            df.iloc[s[0]:e[-1]+1, -3] = float(log_trim[i*7+3][8:])
         else:
-            print(s,e,log_trim[i*5+1][10:])
+            #print(s,e,log_trim[i*5+1][10:])
+            continue
     
     return df
-    
-def trim_edge(data=None, dur_thres=0.2, edge = 10, fix_flag=True, filename=None):
+ 
+ 
+def _split(obj,i):
+    s = str(obj)[1:-1].split(',')
+    return s[i]
+
+def trim_edge(data=None, dur_thres=0.2, edge = 10, fix_flag=True, filename=None, DISPSIZE=DISPSIZE):
     """ remove points of gaze at the screen edges because 
         they are not likely to contain useful information.
     
@@ -82,7 +94,8 @@ def trim_edge(data=None, dur_thres=0.2, edge = 10, fix_flag=True, filename=None)
     dur_thres    float, duration threshold for fixation, in seconds
     edge         integer, trimed edge in pixels
     filename     string (optional), full path to the file in which the trimmed data should be
-                 saved, or None to not save the file (default = None) 
+                 saved, or None to not save the file (default = None)
+    DISPSIZE     tuple, size of display in pixels
     
     Returns:
     data         DataFrame, trimmed data
@@ -91,25 +104,24 @@ def trim_edge(data=None, dur_thres=0.2, edge = 10, fix_flag=True, filename=None)
     if data is None:
         raise ValueError("Invalid argument! 'data' must be a non-empty data frame containing fixation datapoints.")
     
-    EDGEX = (DISPSIZE[0] - IMGSIZE[0]*RESCALE)//2 + edge
-    EDGEY = (DISPSIZE[1] - IMGSIZE[1]*RESCALE)//2 + edge
-    
     data = data[data.FPOGD >= dur_thres]
     if fix_flag:
         data = data[data.FPOGV == 1]
+    data['EDGEX'] = (DISPSIZE[0] - data['IMGSIZE'].apply(_split,args=(0,)).astype('int32')*data['RESCALE'])//2 + edge
+    data['EDGEY'] = (DISPSIZE[1] - data['IMGSIZE'].apply(_split,args=(1,)).astype('int32')*data['RESCALE'])//2 + edge
     data['FPOGXp'] = data['FPOGX']* DISPSIZE[0]
     data['FPOGYp'] = data['FPOGY']* DISPSIZE[1]
-    data = data[data['FPOGXp']>EDGEX]
-    data = data[data['FPOGXp']<DISPSIZE[0]-EDGEX]
-    data = data[data['FPOGYp']>EDGEY]
-    data = data[data['FPOGYp']<DISPSIZE[1]-EDGEY]
+    data = data[data['FPOGXp']>data['EDGEX']]
+    data = data[data['FPOGXp']<DISPSIZE[0]-data['EDGEX']]
+    data = data[data['FPOGYp']>data['EDGEY']]
+    data = data[data['FPOGYp']<DISPSIZE[1]-data['EDGEY']]
     # reset (0,0)
-    data['FPOGXp'] =(data['FPOGXp'] - EDGEX + edge)/RESCALE
-    data['FPOGYp'] = (data['FPOGYp'] - EDGEY + edge)/RESCALE
+    data['FPOGXp'] =(data['FPOGXp'] - data['EDGEX'] + edge)/data['RESCALE']
+    data['FPOGYp'] = (data['FPOGYp'] - data['EDGEY'] + edge)/data['RESCALE']
     
     if filename:
         data.to_csv(filename)
-    return data.reset_index()
+    return data.reset_index(drop=True)
     
 
 def pred_coords(predlabdir:str):
@@ -117,6 +129,7 @@ def pred_coords(predlabdir:str):
     
     Arguments: 
     predlabdir    string, the directory of predicted labels of the tables
+    IMGSIZE       tuple, size of image in pixels
     
     Returns:
     coords        dataframe consists of three columns: img_name, boxes, and box_pixels.
@@ -145,6 +158,7 @@ def pred_coords(predlabdir:str):
             coords = coords.append(row, ignore_index = True)
     return coords
 
+
 def count_density(data=None, boxes=None, imglist=None):
     """
     Count density in the bounding boxes of each table, as a percentage.
@@ -168,11 +182,11 @@ def count_density(data=None, boxes=None, imglist=None):
     if imglist is None:
         raise ValueError("Invalid argument! 'imglist' must be a non-empty list containing image names.")
     z = len(imglist)
-    w,h = IMGSIZE
     m = defaultdict(list)
     for img in imglist:
         img_name = img.upper()
-        datai = data[data.IMGID==img_name]
+        datai = data[data.IMGID==img_name].reset_index(drop=True)
+        RESCALE = datai['RESCALE'][0]
         _len = len(datai)
         if _len == 0: m[img] = []
         else:
@@ -181,14 +195,13 @@ def count_density(data=None, boxes=None, imglist=None):
             dens_list = []
             for box in boxi:
                 #xmin, ymin, wd, ht = box
-                xmin, ymin, xmax, ymax = box
+                xmin, ymin, xmax, ymax = [int(i * RESCALE) for i in box]
                 #calculate density in percentage
                 density = round(len(datai[(datai.FPOGXp>=xmin-10)&(datai.FPOGXp<=xmax+10) & 
                                           (datai.FPOGYp>=ymin-10)&(datai.FPOGYp<=ymax+10)])/_len * 100,2)
                 dens_list.append(density)
             m[img] = dens_list
     return m
-
 
 
 def dbscan(data=None, eps=50, min_samples=5):

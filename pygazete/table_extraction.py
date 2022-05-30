@@ -6,6 +6,7 @@ from collections import defaultdict
 import keyboard
 import pylink
 
+from PIL import Image
 from pygaze.libscreen import Display, Screen
 from pygaze.libinput import Keyboard
 from pygaze.eyetracker import EyeTracker
@@ -32,8 +33,10 @@ warnings.filterwarnings('ignore')
 
 
 
-def advanced(RESCALE=RESCALE, MAXTRIALTIME=MAXTRIALTIME,
-             DISPSIZE=DISPSIZE, IMGSIZE=IMGSIZE, ip=ip, **kwargs):
+def advanced(MAXTRIALTIME=MAXTRIALTIME,
+             DISPSIZE=DISPSIZE, ip=ip, 
+             mode = 7, split='cell', 
+             borderless=True, **kwargs):
     try:
         kwargs['DIR'] and os.path.exists(kwargs['DIR'])
         DIR = kwargs['DIR']
@@ -55,20 +58,21 @@ def advanced(RESCALE=RESCALE, MAXTRIALTIME=MAXTRIALTIME,
     exps = sorted([e for e in exps if e != 'exp' and e.startswith('exp')], key = lambda x: int(x[3:]))
     PREDDIR = os.path.join(RESULTDIR, exps[-1])
     LB_PREDDIR = os.path.join(PREDDIR, 'labels')
+    CROPDIR = os.path.join(PREDDIR, 'crops\\table')
     
     PLOTDIR = new_dir(PREDDIR, 'plots')
     DATADIR = new_dir(PREDDIR, 'gaze_data')
+    OCRDIR = new_dir(PREDDIR, 'ocr')
     LOGFILENAME = tstamp+'D'+str(MAXTRIALTIME//1000)
     LOGFILE = os.path.join(DATADIR, LOGFILENAME)
     
-    # read test images    
+    # read test images        
     images = [f for f in os.listdir(IMGDIR) if allowed_format(f)]
     ntrials = len(images)
     
-    # read predicted table coordinates
-    coords = pred_coords(LB_PREDDIR)
     
-
+    #------------------------------------------------------------------------------
+    #-------------Eye gaze --------------------------------------------------------
     # initialize objects
     disp = Display()
     scr = Screen()
@@ -120,7 +124,7 @@ def advanced(RESCALE=RESCALE, MAXTRIALTIME=MAXTRIALTIME,
 
     scr.clear()
     txt = f'You will see {ntrials} images in sequence, each containing one or more tables. '
-    txt = txt + f'Please gaze at a table of interest in each image for {MAXTRIALTIME//1000} seconds.'
+    txt = txt + f'Please gaze at the CENTER of one table of interest in each image for {MAXTRIALTIME//1000} seconds.'
     txt = txt + '\n\n' + f'Click the mouse to start.'
     scr.draw_text(text= txt, fontsize=20)
     disp.fill(scr)
@@ -131,11 +135,21 @@ def advanced(RESCALE=RESCALE, MAXTRIALTIME=MAXTRIALTIME,
     mouse.get_clicked()
 
     exp_t0 = time.time()
+    
+    IMGSIZE_list, RESCALE_list = [],[]
+    
     # loop through all trials
     for trialnr in range(ntrials):
         
         # PREPARE TRIAL
         # draw the image
+        arr_img = np.array(Image.open(os.path.join(IMGDIR, images[trialnr])))
+        IMGSIZE = (arr_img.shape[1], arr_img.shape[0])
+        RESCALE = min(round(DISPSIZE[0] / IMGSIZE[0], 1), round(DISPSIZE[1] / IMGSIZE[1], 1))
+        
+        IMGSIZE_list.append(IMGSIZE)
+        RESCALE_list.append(RESCALE)
+        
         scr.clear()
         scr.draw_image(os.path.join(IMGDIR,images[trialnr]),scale=RESCALE)
     
@@ -144,6 +158,8 @@ def advanced(RESCALE=RESCALE, MAXTRIALTIME=MAXTRIALTIME,
         tracker.start_recording()
         tracker.log("TRIALSTART %d" % trialnr)
         tracker.log("IMAGENAME %s" % images[trialnr])
+        tracker.log("IMGSIZE %s" % str(IMGSIZE))
+        tracker.log("RESCALE %s" % str(RESCALE))
         tracker.status_msg("trial %d/%d" % (trialnr+1, ntrials))
     
         # present image
@@ -216,6 +232,10 @@ def advanced(RESCALE=RESCALE, MAXTRIALTIME=MAXTRIALTIME,
     disp.show()
 
     prep_t0 = time.time()
+    
+    # read table coordinates predicted by YOLOv5 model
+    coords = pred_coords(LB_PREDDIR)
+    
     for file in os.listdir(DATADIR):
         if not file.startswith(LOGFILENAME):
             continue
@@ -272,8 +292,11 @@ def advanced(RESCALE=RESCALE, MAXTRIALTIME=MAXTRIALTIME,
     
         # PREPARE TRIAL
         # draw the image
+        RESCALE = RESCALE_list[trialnr]
+        IMGSIZE = IMGSIZE_list[trialnr]
+        
         scr.clear()
-        scr.draw_image(os.path.join(PREDDIR,images[trialnr]),scale=1.0)
+        scr.draw_image(os.path.join(PREDDIR,images[trialnr]),scale=RESCALE)
         disp.fill(scr)
     
     
@@ -283,9 +306,10 @@ def advanced(RESCALE=RESCALE, MAXTRIALTIME=MAXTRIALTIME,
         i = v.index(max(v))
         _x,_y,_w,_h = coords[coords.img_name == img_name.split('.')[0]].boxes.values[0][i]
         #in pixels
-        edge_x = (DISPSIZE[0] - IMGSIZE[0])//2
-        edge_y = (DISPSIZE[1] - IMGSIZE[1])//2
-        x,y,w,h = (_x-_w/2)*IMGSIZE[0]+edge_x, (_y-_h/2)*IMGSIZE[1]+edge_y, _w*IMGSIZE[0], _h*IMGSIZE[1]
+        
+        edge_x = (DISPSIZE[0] - IMGSIZE[0]*RESCALE)//2
+        edge_y = (DISPSIZE[1] - IMGSIZE[1]*RESCALE)//2
+        x,y,w,h = (_x-_w/2)*IMGSIZE[0]*RESCALE+edge_x, (_y-_h/2)*IMGSIZE[1]*RESCALE+edge_y, _w*IMGSIZE[0]*RESCALE, _h*IMGSIZE[1]*RESCALE
         scr.draw_rect(colour='blue', x=x, y=y, w=w, h=h, pw=5)
         disp.fill(scr)
     
@@ -312,8 +336,7 @@ def advanced(RESCALE=RESCALE, MAXTRIALTIME=MAXTRIALTIME,
 
     # exit message
     scr.clear()
-    scr.draw_text(text="This is the end of this experiment. Thanks for participating!\n\n(click the mouse to exit)", 
-                  fontsize=20)
+    scr.draw_text(text="This is the end of this experiment. Thanks for participating!\n\n(click the mouse to exit)", fontsize=20)
     disp.fill(scr)
     disp.show()
 

@@ -1,5 +1,6 @@
 import cv2 
 import matplotlib.pyplot as plt
+plt.style.use('default')
 import numpy as np
 import pandas as pd
 import os
@@ -93,7 +94,7 @@ def remove_background(img=None, method='binary',thresh=150, tozero_thresh=[100,2
     
 
 ####################################################################
-def contours(img, mask, axis):
+def contours(img, mask, axis, hd=None):
     """generate contours for gridlines in image-form tables
     and returns a mask
     
@@ -103,12 +104,19 @@ def contours(img, mask, axis):
                     shape (height, width)
     mask            array, an array of zeros with shape (height, width)
     axis            int, 0 or 1. axis = 1 detects rows, axis = 0 detects columns
+    hd              list, row/column coordinates (in pixels)
     
     returns
     -----------
     mask            array, modified mask with white gridlines and black background
     """
     assert img is not None and axis in [0,1]
+    
+    
+    dim0 = img.shape[axis]
+    
+    if hd is not None and len(hd) > 3:
+        img = img[hd[1]:hd[-2],:]
     
     dim = img.shape[axis]
     count = np.count_nonzero(img, axis=axis)
@@ -146,6 +154,7 @@ def contours(img, mask, axis):
     # reverse the order
     coords.reverse()
     coords.append(img.shape[1-axis]-1)
+    
     #print("coords: ",coords)
     
     dif = list(np.diff(coords))
@@ -165,11 +174,14 @@ def contours(img, mask, axis):
     
     for c in trim_c:
         if axis == 0:
-            cv2.line(mask, (c,0), (c,dim-1), (255, 0, 0), 2)
+            cv2.line(mask, (c,0), (c,dim0-1), (255, 0, 0), 2)
         elif axis == 1:
-            cv2.line(mask, (0,c), (dim-1,c), (255, 0, 0), 2)
+            cv2.line(mask, (0,c), (dim0-1,c), (255, 0, 0), 2)
+
     
-    return mask   
+    #possible height for header/footer rows
+    #hd = img.shape[0] // (len(trim_c))
+    return mask, trim_c 
     
 ####################################################    
 def get_borders(img=None, method = 'row', borderless=True, 
@@ -218,10 +230,11 @@ def get_borders(img=None, method = 'row', borderless=True,
         mask = np.zeros(dims, np.uint8)
         line_indices = _incomplete_lines(thresh)
         # for row detection, remove all gridlines
-        processed = remove_incomplete_lines(thresh,line_indices, axis=1)
-        mask = contours(processed, mask, axis = 1)
+        noline1 = remove_incomplete_lines(thresh,line_indices, axis=1)
+        mask,hd = contours(noline1, mask, axis = 1)
         # for column detection, only remove long horizontal gridlines for more accuracy recognition
-        mask = contours(remove_incomplete_lines(thresh,line_indices, axis=0), mask, axis = 0)
+        noline0 = remove_incomplete_lines(thresh,line_indices, axis=0)
+        mask,_ = contours(noline0, mask, axis = 0, hd=hd)
 
     else:
         thresh = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
@@ -257,15 +270,7 @@ def get_borders(img=None, method = 'row', borderless=True,
     #merge
     merge = cv2.add(dilatedcol, dilatedrow)
     _, merge_c = cv2.threshold(merge, 50, 255, cv2.THRESH_BINARY)
-    
-    #get intersection coordinates
-    xs, ys = np.where(bitwiseAnd>1)
-    
-    xs.sort()
-    ys.sort()
-    #print(np.unique(xs))
-    #print(np.unique(ys))
-    
+        
     
     contours_, hierarchy = cv2.findContours(255-merge_c, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     #contours = contours_[0] if len(contours_) == 2 else contours_[1] 
@@ -273,10 +278,21 @@ def get_borders(img=None, method = 'row', borderless=True,
     
     
     # remove narrow boxes with width less than 1/40 of rows or height less than 1/50 of columns
-    boxes = [b for b in boxes if b[2]>=c//40 and b[3]>=r//40]
+    boxes = [b for b in boxes if b[2]>=c//60 and b[3]>=r//60]
     coords = sort_boxes(boxes)
 
-
+    if method == 'cell':
+        i=1
+        while i < len(coords):
+            c1, c2 = coords[i-1], coords[i]
+            if c1[1] == c2[1]:
+                m = merge_cell(noline1, c1,c2)
+                if m: 
+                    coords.pop(i-1)
+                    coords.pop(i-1)
+                    coords.insert(i-1, m)
+                    i-=1
+            i+=1
     
     if plot: 
         # show intersection points more clearly
@@ -291,9 +307,9 @@ def get_borders(img=None, method = 'row', borderless=True,
         plots_ = dict()
         
         plots_['original image with border coordinates'] = im
-        plots_['thresholding'] = thresh
-        plots_['remove lines (column)'] = remove_incomplete_lines(thresh,line_indices, axis=0)
-        plots_['remove lines (row)'] = remove_incomplete_lines(thresh,line_indices, axis=1)
+        plots_['removing background and thresholding'] = thresh
+        plots_['remove lines (column)'] = noline0
+        plots_['remove lines (row)'] = noline1
         plots_['binary mask'] = mask
         subtitle = img_name + ': ' if img_name is not None else ""
         if method == 'cell':
@@ -316,7 +332,7 @@ def get_borders(img=None, method = 'row', borderless=True,
         plt.show()
 
     
-    return processed, coords   
+    return noline1, coords   
 
 
 ######################################################################
@@ -423,12 +439,12 @@ def box_positions(boxes):
     dims            tuple, (rows, cols), the maximum number of rows and cols recognized in the table
     positions       array, the processed grayscale image as a numpy array with shape (height, width)
     """
-    print(boxes)
+    #print(boxes)
     col_idx = list(np.unique(np.array(boxes)[:,0]))
     row_idx = list(np.unique(np.array(boxes)[:,1]))
-    max_cols = len(col_idx)
-    max_rows = len(row_idx)
-    dims = (max_rows, max_cols)
+    n_cols = len(col_idx)
+    n_rows = len(row_idx)
+    dims = (n_rows, n_cols)
     
     bboxes = np.array(boxes)
     positions = []
@@ -449,6 +465,27 @@ def max_consecutive(a:np.array):
     a_ext[1:][idx[1::2]] = idx[1::2]-idx[::2] 
     return max(a_ext)
     
+    
+def merge_cell(img, cell1, cell2):
+    """merge two cells horizontally""" 
+    x1,y1,w1,h1 = cell1
+    x2,y2,w2,h2 = cell2
+    # if heights of two cells differ by a lot, do not merge
+    if not abs(h2-h1) < h1//2:
+        return 
+    # count characters near the end the first cell and near the start of the second cell
+    # if the characters are close enough, the two cells should be considered as a single cell
+    tail1 = np.count_nonzero(img[y1:(y1+h1), (x1+w1-h1//3):(x1+w1)]==0)
+    head2 = np.count_nonzero(img[y2:(y2+h2), x2:(x2+h2//3)]==0)
+    count1 = np.count_nonzero(img[y1:(y1+h1), x1:(x1+w1)]==0)
+    count2 = np.count_nonzero(img[y2:(y2+h2), x2:(x2+w2)]==0)
+    if (count1 > 1 and count2 <= 1) or (tail1 > h1//4 and head2 > h2//4):
+        merged = (x1,y1, w2+x2-x1, h1)
+        return merged
+    else:
+        return    
+
+
 def allEmpty(a: np.array):
     return all(a == '')
 

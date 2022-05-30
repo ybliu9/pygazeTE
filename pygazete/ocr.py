@@ -120,7 +120,7 @@ def extract(test_file_path, output_dir, mode=7, split='cell',borderless=True,deb
 			block = image[y:y+h,x:x+w]
 			text = pt.image_to_string(block, lang='fintabnet_full', config='--psm '+str(mode))
 			# remove '\n' (from mode 7) and replace '\n\n' (from mode 12)
-			text = text.strip('\n').replace('\n\n','|') if text else text
+			text = text.strip('\n').replace('\n\n','|').replace('—','-') if text else text
 			data[i][j] = text
             
 		data = reconstruction_check(pd.DataFrame(data))

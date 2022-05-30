@@ -27,8 +27,8 @@ warnings.filterwarnings('ignore')
 
 
 
-def baseline(RESCALE=RESCALE, MAXTRIALTIME=MAXTRIALTIME,
-             DISPSIZE=DISPSIZE, IMGSIZE=IMGSIZE, ip=ip, **kwargs):
+def baseline(MAXTRIALTIME=MAXTRIALTIME,
+             DISPSIZE=DISPSIZE, ip=ip, **kwargs):
     try:
         kwargs['DIR'] and os.path.exists(kwargs['DIR'])
         DIR = kwargs['DIR']
@@ -120,11 +120,20 @@ def baseline(RESCALE=RESCALE, MAXTRIALTIME=MAXTRIALTIME,
     mouse.get_clicked()
 
     exp_t0 = time.time()
+    
+    IMGSIZE_list, RESCALE_list = [],[]
     # loop through all trials
     for trialnr in range(ntrials):
         
         # PREPARE TRIAL
         # draw the image
+        arr_img = np.array(Image.open(os.path.join(IMGDIR, images[trialnr])))
+        IMGSIZE = (arr_img.shape[1], arr_img.shape[0])
+        RESCALE = min(round(DISPSIZE[0] / IMGSIZE[0], 1), round(DISPSIZE[1] / IMGSIZE[1], 1))
+        
+        IMGSIZE_list.append(IMGSIZE)
+        RESCALE_list.append(RESCALE)
+        
         scr.clear()
         scr.draw_image(os.path.join(IMGDIR,images[trialnr]),scale=RESCALE)
     
@@ -133,6 +142,8 @@ def baseline(RESCALE=RESCALE, MAXTRIALTIME=MAXTRIALTIME,
         tracker.start_recording()
         tracker.log("TRIALSTART %d" % trialnr)
         tracker.log("IMAGENAME %s" % images[trialnr])
+        tracker.log("IMGSIZE %s" % str(IMGSIZE))
+        tracker.log("RESCALE %s" % str(RESCALE))
         tracker.status_msg("trial %d/%d" % (trialnr+1, ntrials))
     
         # present image
@@ -260,8 +271,12 @@ def baseline(RESCALE=RESCALE, MAXTRIALTIME=MAXTRIALTIME,
     
         # PREPARE TRIAL
         # draw the image
+        RESCALE = RESCALE_list[trialnr]
+        IMGSIZE = IMGSIZE_list[trialnr]
+        
+        
         scr.clear()
-        scr.draw_image(os.path.join(IMGDIR,images[trialnr]),scale=1.0)
+        scr.draw_image(os.path.join(IMGDIR,images[trialnr]),scale=RESCALE)
         disp.fill(scr)
     
         img_name = images[trialnr]
