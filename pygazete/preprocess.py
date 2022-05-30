@@ -70,7 +70,7 @@ def process_data(datadir:str, datafile:str, logfile:str, ntrials:int):
         s = df.index[df.USER.isin(log_trim[i*7:i*7+5])].tolist()
         e = df.index[df.USER.isin(log_trim[i*7+5:(i+1)*7])].tolist()
         if s and e:
-            r_idx = 
+
             df.iloc[s[0]:e[-1]+1, -1] = log_trim[i*7+1][10:]#.lstrip('IMAGENAME ')
             df.iloc[s[0]:e[-1]+1, -2] = log_trim[i*7+2][8:]
             df.iloc[s[0]:e[-1]+1, -3] = float(log_trim[i*7+3][8:])
